@@ -106,6 +106,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { inflate } from 'pako'
 
 const route = useRoute()
 const payload = ref(null)
@@ -113,12 +114,25 @@ const error = ref(false)
 const copiedIndex = ref(-1)
 const copiedAll = ref(false)
 
+function decodeData(data) {
+  if (data.startsWith('z.')) {
+    // Compressed format
+    const b64 = data.slice(2).replace(/-/g, '+').replace(/_/g, '/')
+    const padded = b64 + '=='.slice(0, (4 - b64.length % 4) % 4)
+    const binary = atob(padded)
+    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0))
+    const json = new TextDecoder().decode(inflate(bytes))
+    return JSON.parse(json)
+  }
+  // Legacy uncompressed format
+  const padded = data.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - data.length % 4) % 4)
+  const decoded = decodeURIComponent(escape(atob(padded)))
+  return JSON.parse(decoded)
+}
+
 onMounted(() => {
   try {
-    const data = route.params.data
-    const padded = data.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - data.length % 4) % 4)
-    const decoded = decodeURIComponent(escape(atob(padded)))
-    payload.value = JSON.parse(decoded)
+    payload.value = decodeData(route.params.data)
   } catch {
     error.value = true
   }

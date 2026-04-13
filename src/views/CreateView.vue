@@ -117,6 +117,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { deflate } from 'pako'
 import DnsRecordRow from '../components/DnsRecordRow.vue'
 
 const router = useRouter()
@@ -162,12 +163,15 @@ function generateLink() {
     })).filter(r => r.n || r.v),
   }
 
-  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))))
+  const json = JSON.stringify(payload)
+  const compressed = deflate(new TextEncoder().encode(json))
+  const base64 = btoa(String.fromCharCode(...compressed))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '')
 
-  const resolved = router.resolve({ name: 'share', params: { data: encoded } })
+  // Prefix with 'z.' to indicate compressed format
+  const resolved = router.resolve({ name: 'share', params: { data: 'z.' + base64 } })
   shareLink.value = window.location.origin + resolved.href
 }
 
